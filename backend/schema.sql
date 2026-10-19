@@ -195,3 +195,62 @@ WHERE id = 3;
 
 -- Verify cascade deletion: no join_requests remain with project_id = 3
 SELECT * FROM join_requests WHERE project_id = 3;
+
+
+-- =============================================================================
+-- G. DASHBOARD ANALYTICS & ADVANCED SQL DEMONSTRATIONS
+-- =============================================================================
+
+-- 1. Summary Metrics via Scalar Subqueries:
+SELECT 
+    (SELECT COUNT(*) FROM projects) AS total_projects,
+    (SELECT COUNT(*) FROM join_requests) AS total_join_requests,
+    (SELECT COUNT(*) FROM join_requests WHERE status = 'Pending') AS pending_join_requests,
+    (SELECT COUNT(*) FROM join_requests WHERE status = 'Accepted') AS accepted_join_requests,
+    (SELECT COUNT(*) FROM join_requests WHERE status = 'Rejected') AS rejected_join_requests;
+
+-- 2. Category Distribution via GROUP BY and ORDER BY:
+SELECT category, COUNT(*) AS count
+FROM projects
+GROUP BY category
+ORDER BY count DESC, category ASC;
+
+-- 3. Project Collaboration Table:
+-- Demonstrates:
+--   - INNER JOIN (projects and users to get project owner's name)
+--   - LEFT JOIN (projects and join_requests to include projects with 0 requests)
+--   - COUNT(jr.id) (total request volume per project)
+--   - Conditional Aggregation: COUNT(CASE WHEN jr.status = 'Pending' THEN 1 END)
+--   - Conditional Aggregation: COUNT(CASE WHEN jr.status = 'Accepted' THEN 1 END)
+--   - GROUP BY (non-aggregated columns: p.id, p.title, u.name, p.category)
+--   - ORDER BY (total_requests DESC to rank most collaborative projects first)
+SELECT 
+    p.id,
+    p.title,
+    u.name AS owner_name,
+    p.category,
+    COUNT(jr.id) AS total_requests,
+    COUNT(CASE WHEN jr.status = 'Pending' THEN 1 END) AS pending_requests,
+    COUNT(CASE WHEN jr.status = 'Accepted' THEN 1 END) AS accepted_requests
+FROM projects p
+INNER JOIN users u ON p.owner_id = u.id
+LEFT JOIN join_requests jr ON p.id = jr.project_id
+GROUP BY p.id, p.title, u.name, p.category
+ORDER BY total_requests DESC, p.title ASC;
+
+-- 4. Popular Projects (Top Most Requested Projects):
+-- Demonstrates: Aggregated sorting with LIMIT clause
+SELECT 
+    p.id,
+    p.title,
+    p.category,
+    u.name AS owner_name,
+    COUNT(jr.id) AS total_requests,
+    COUNT(CASE WHEN jr.status = 'Accepted' THEN 1 END) AS accepted_requests
+FROM projects p
+INNER JOIN users u ON p.owner_id = u.id
+LEFT JOIN join_requests jr ON p.id = jr.project_id
+GROUP BY p.id, p.title, p.category, u.name
+ORDER BY total_requests DESC, p.id ASC
+LIMIT 4;
+

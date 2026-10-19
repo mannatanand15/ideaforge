@@ -256,3 +256,19 @@ export async function checkBackendHealth() {
     return null;
   }
 }
+
+/**
+ * Fetch aggregated dashboard metrics from PostgreSQL via FastAPI backend.
+ * GET /api/dashboard
+ */
+export async function getDashboardData() {
+  try {
+    const res = await fetch(`${API_BASE}/dashboard`);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('API error fetching dashboard data:', err.message);
+    throw err;
+  }
+}
+

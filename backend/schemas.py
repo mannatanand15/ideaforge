@@ -71,3 +71,40 @@ class JoinRequestResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ==================== DASHBOARD SCHEMAS ====================
+class CategoryStat(BaseModel):
+    category: str
+    count: int
+
+class ProjectCollaborationStat(BaseModel):
+    id: int
+    title: str
+    owner_name: str
+    category: str
+    total_requests: int
+    pending_requests: int
+    accepted_requests: int
+
+class PopularProject(BaseModel):
+    id: int
+    title: str
+    category: str
+    owner_name: str
+    total_requests: int
+    accepted_requests: int
+
+class DashboardSummary(BaseModel):
+    total_projects: int
+    total_join_requests: int
+    pending_join_requests: int
+    accepted_join_requests: int
+    rejected_join_requests: int
+
+class DashboardResponse(BaseModel):
+    summary: DashboardSummary
+    categories: List[CategoryStat]
+    collaboration_table: List[ProjectCollaborationStat]
+    popular_projects: List[PopularProject]
+

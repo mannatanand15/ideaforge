@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { Lightbulb, Compass, PlusCircle, FolderKanban } from 'lucide-react';
+import { Lightbulb, Compass, LayoutDashboard, PlusCircle, FolderKanban } from 'lucide-react';
 
 /**
  * Navbar component for IdeaForge
@@ -28,6 +28,16 @@ export default function Navbar() {
             >
               <Compass size={17} />
               <span>Explore Projects</span>
+            </NavLink>
+          </li>
+
+          <li>
+            <NavLink
+              to="/dashboard"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <LayoutDashboard size={17} />
+              <span>Dashboard</span>
             </NavLink>
           </li>
 

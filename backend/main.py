@@ -7,7 +7,7 @@ from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, text
 
 import models
 import schemas
@@ -521,3 +521,124 @@ def get_user_incoming_requests(user_id: int, db: Session = Depends(get_db)):
             )
         )
     return result
+
+
+# ==================== DASHBOARD ENDPOINT ====================
+@app.get("/api/dashboard", response_model=schemas.DashboardResponse)
+def get_dashboard_metrics(db: Session = Depends(get_db)):
+    """
+    Retrieve collaboration dashboard analytics using relational PostgreSQL queries:
+    1. Summary metrics (scalar subqueries)
+    2. Category distribution (COUNT, GROUP BY, ORDER BY)
+    3. Project collaboration table (INNER JOIN with users, LEFT JOIN with join_requests, COUNT, CASE WHEN, GROUP BY, ORDER BY)
+    4. Popular projects (Aggregated sorting with LIMIT)
+    """
+    try:
+        # 1. Summary Metrics: Overall counts
+        summary_query = text("""
+            SELECT 
+                (SELECT COUNT(*) FROM projects) AS total_projects,
+                (SELECT COUNT(*) FROM join_requests) AS total_join_requests,
+                (SELECT COUNT(*) FROM join_requests WHERE status = 'Pending') AS pending_join_requests,
+                (SELECT COUNT(*) FROM join_requests WHERE status = 'Accepted') AS accepted_join_requests,
+                (SELECT COUNT(*) FROM join_requests WHERE status = 'Rejected') AS rejected_join_requests;
+        """)
+        summary_row = db.execute(summary_query).fetchone()
+        summary = schemas.DashboardSummary(
+            total_projects=summary_row.total_projects or 0,
+            total_join_requests=summary_row.total_join_requests or 0,
+            pending_join_requests=summary_row.pending_join_requests or 0,
+            accepted_join_requests=summary_row.accepted_join_requests or 0,
+            rejected_join_requests=summary_row.rejected_join_requests or 0
+        )
+
+        # 2. Category Distribution: GROUP BY category
+        category_query = text("""
+            SELECT category, COUNT(*) AS count
+            FROM projects
+            GROUP BY category
+            ORDER BY count DESC, category ASC;
+        """)
+        category_rows = db.execute(category_query).fetchall()
+        categories = [
+            schemas.CategoryStat(category=row.category, count=row.count)
+            for row in category_rows
+        ]
+
+        # 3. Project Collaboration Table:
+        # Demonstrates:
+        # - INNER JOIN with users (to display project owner's name)
+        # - LEFT JOIN with join_requests (to ensure projects with 0 requests are included)
+        # - Conditional aggregation (COUNT CASE WHEN ...) for pending & accepted counts
+        # - GROUP BY project attributes and owner name
+        # - ORDER BY total_requests DESC
+        collab_query = text("""
+            SELECT 
+                p.id,
+                p.title,
+                u.name AS owner_name,
+                p.category,
+                COUNT(jr.id) AS total_requests,
+                COUNT(CASE WHEN jr.status = 'Pending' THEN 1 END) AS pending_requests,
+                COUNT(CASE WHEN jr.status = 'Accepted' THEN 1 END) AS accepted_requests
+            FROM projects p
+            INNER JOIN users u ON p.owner_id = u.id
+            LEFT JOIN join_requests jr ON p.id = jr.project_id
+            GROUP BY p.id, p.title, u.name, p.category
+            ORDER BY total_requests DESC, p.title ASC;
+        """)
+        collab_rows = db.execute(collab_query).fetchall()
+        collaboration_table = [
+            schemas.ProjectCollaborationStat(
+                id=row.id,
+                title=row.title,
+                owner_name=row.owner_name,
+                category=row.category,
+                total_requests=row.total_requests,
+                pending_requests=row.pending_requests,
+                accepted_requests=row.accepted_requests
+            )
+            for row in collab_rows
+        ]
+
+        # 4. Popular Projects: Most requested projects using aggregation, sorting, and LIMIT
+        popular_query = text("""
+            SELECT 
+                p.id,
+                p.title,
+                p.category,
+                u.name AS owner_name,
+                COUNT(jr.id) AS total_requests,
+                COUNT(CASE WHEN jr.status = 'Accepted' THEN 1 END) AS accepted_requests
+            FROM projects p
+            INNER JOIN users u ON p.owner_id = u.id
+            LEFT JOIN join_requests jr ON p.id = jr.project_id
+            GROUP BY p.id, p.title, p.category, u.name
+            ORDER BY total_requests DESC, p.id ASC
+            LIMIT 4;
+        """)
+        popular_rows = db.execute(popular_query).fetchall()
+        popular_projects = [
+            schemas.PopularProject(
+                id=row.id,
+                title=row.title,
+                category=row.category,
+                owner_name=row.owner_name,
+                total_requests=row.total_requests,
+                accepted_requests=row.accepted_requests
+            )
+            for row in popular_rows
+        ]
+
+        return schemas.DashboardResponse(
+            summary=summary,
+            categories=categories,
+            collaboration_table=collaboration_table,
+            popular_projects=popular_projects
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate dashboard statistics: {str(e)}"
+        )
+
