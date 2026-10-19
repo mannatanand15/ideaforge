@@ -13,7 +13,6 @@ import {
   Check,
   X,
   Clock,
-  Database,
   Inbox,
   AlertCircle
 } from 'lucide-react';
@@ -29,12 +28,10 @@ import {
 
 /**
  * Page 3: Project Details
- * Connects directly to FastAPI backend and PostgreSQL database.
- * Demonstrates:
- * 1. SELECT * FROM projects WHERE id = ?
- * 2. SELECT * FROM join_requests WHERE project_id = ?
- * 3. INSERT INTO join_requests (...)
- * 4. UPDATE join_requests SET status = ? WHERE id = ?
+ * Clean, professional student collaboration view.
+ * - Project Owner sees all incoming requests with Accept/Reject actions for Pending requests.
+ * - Applicants see only their own request status (Pending, Accepted, Rejected) without action buttons.
+ * - Non-owners who haven't applied see only project details and the "Request to Join" button.
  */
 export default function ProjectDetails() {
   const { id } = useParams();
@@ -55,9 +52,6 @@ export default function ProjectDetails() {
   const [actionNotice, setActionNotice] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  // Toggle for viva demonstration: allows demonstrating owner Accept/Reject actions
-  const [isOwnerView, setIsOwnerView] = useState(false);
-
   useEffect(() => {
     loadProjectData();
   }, [id]);
@@ -70,9 +64,6 @@ export default function ProjectDetails() {
       setProject(foundProject);
 
       if (foundProject) {
-        if (foundProject.createdByCurrentUser) {
-          setIsOwnerView(true);
-        }
         await loadRequests(foundProject.id);
       }
     } catch (err) {
@@ -91,6 +82,20 @@ export default function ProjectDetails() {
       console.warn('Error fetching requests from API:', err);
     }
   };
+
+  // Determine whether current user is the owner of this project
+  const isOwner = Boolean(
+    project && (project.ownerId === CURRENT_USER_ID || project.createdByCurrentUser)
+  );
+
+  // Check if current user has already submitted a request for this project
+  const myRequest = requests.find(
+    (r) =>
+      r.userId === CURRENT_USER_ID ||
+      (r.applicantEmail &&
+        CURRENT_USER_EMAIL &&
+        r.applicantEmail.toLowerCase() === CURRENT_USER_EMAIL.toLowerCase())
+  );
 
   // Map category to specific badge CSS classes
   const getCategoryBadgeClass = (category) => {
@@ -145,7 +150,6 @@ export default function ProjectDetails() {
 
     setIsSubmittingJoin(true);
     try {
-      // PostgreSQL: INSERT INTO join_requests
       await submitJoinRequest({
         projectId: project.id,
         applicantName: requestFormData.applicantName,
@@ -161,7 +165,7 @@ export default function ProjectDetails() {
         message: ''
       });
       setJoinSuccessNotice(
-        `Join request inserted into PostgreSQL with status = 'Pending'. The project lead can accept or reject your application.`
+        'Your request to join has been submitted! It is now pending review by the project owner.'
       );
     } catch (err) {
       setFormErrors({ submit: err.message || 'Failed to submit join request.' });
@@ -170,13 +174,13 @@ export default function ProjectDetails() {
     }
   };
 
-  // Owner action: Accept or Reject request (PostgreSQL: UPDATE join_requests SET status = ?)
+  // Owner action: Accept or Reject request
   const handleUpdateStatus = async (requestId, newStatus, applicantName) => {
     try {
       await updateJoinRequestStatus(requestId, newStatus);
       await loadRequests(project.id);
       setActionNotice(
-        `Request from ${applicantName} updated to ${newStatus.toUpperCase()} in PostgreSQL database.`
+        `Application from ${applicantName} has been ${newStatus.toLowerCase()}.`
       );
       setTimeout(() => {
         setActionNotice(null);
@@ -187,11 +191,10 @@ export default function ProjectDetails() {
     }
   };
 
-  // If loading
   if (isLoading) {
     return (
       <div className="main-content" style={{ textAlign: 'center', padding: '4rem 0' }}>
-        <p style={{ color: 'var(--text-secondary)' }}>Loading project details from PostgreSQL...</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Loading project details...</p>
       </div>
     );
   }
@@ -213,7 +216,7 @@ export default function ProjectDetails() {
           </div>
           <h2 className="empty-state-title">Project Not Found</h2>
           <p className="empty-state-desc">
-            The project you are looking for (ID: <code>{id}</code>) does not exist in PostgreSQL or may have been deleted.
+            The project you are looking for (ID: <code>{id}</code>) does not exist or may have been deleted.
           </p>
           <Link to="/" className="btn btn-primary">
             <ArrowLeft size={16} />
@@ -242,33 +245,15 @@ export default function ProjectDetails() {
       </div>
 
       <div className="details-card">
-        {/* Viva / Role Switcher Banner */}
-        <div className="owner-toggle-banner">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Database size={16} style={{ color: 'var(--primary-blue)' }} />
-            <span style={{ fontSize: '0.85rem', color: '#1e3a8a' }}>
-              <strong>DBMS Viva Demo Mode:</strong> Viewing as{' '}
-              <strong>{isOwnerView ? 'Project Owner (Can Accept/Reject)' : 'Student Applicant'}</strong>
-            </span>
-          </div>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => setIsOwnerView(!isOwnerView)}
-          >
-            Switch to {isOwnerView ? 'Applicant View' : 'Owner View'}
-          </button>
-        </div>
-
         {/* Header: Category Badge & Title */}
         <div className="details-header">
           <div className="details-category">
             <span className={`badge ${getCategoryBadgeClass(project.category)}`}>
               {project.category}
             </span>
-            {project.createdByCurrentUser && (
+            {isOwner && (
               <span className="badge badge-my-project" style={{ marginLeft: '0.5rem' }}>
-                Your Project (PostgreSQL Owner)
+                Your Project
               </span>
             )}
           </div>
@@ -320,7 +305,7 @@ export default function ProjectDetails() {
                 <Calendar size={18} />
               </div>
               <div>
-                <div className="details-meta-label">Date Stored</div>
+                <div className="details-meta-label">Date Posted</div>
                 <div className="details-meta-value">{project.createdAt}</div>
               </div>
             </div>
@@ -367,14 +352,54 @@ export default function ProjectDetails() {
 
         {/* Primary Page Action Buttons */}
         <div className="details-actions">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => setIsModalOpen(true)}
-          >
-            <Send size={16} />
-            <span>Request to Join This Project</span>
-          </button>
+          {isOwner ? (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.6rem 1.1rem',
+                backgroundColor: 'var(--primary-blue-light)',
+                color: 'var(--primary-blue)',
+                borderRadius: 'var(--radius-sm)',
+                fontWeight: 600,
+                fontSize: '0.925rem',
+                border: '1px solid #bfdbfe'
+              }}
+            >
+              <User size={16} />
+              <span>You own this project</span>
+            </div>
+          ) : myRequest ? (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled
+              style={{ cursor: 'default', opacity: 0.9 }}
+            >
+              <CheckCircle
+                size={16}
+                style={{
+                  color:
+                    myRequest.status === 'Accepted'
+                      ? '#10b981'
+                      : myRequest.status === 'Rejected'
+                      ? '#ef4444'
+                      : '#f59e0b'
+                }}
+              />
+              <span>Request Submitted ({myRequest.status})</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setIsModalOpen(true)}
+            >
+              <Send size={16} />
+              <span>Request to Join This Project</span>
+            </button>
+          )}
 
           <Link to="/" className="btn btn-secondary">
             <ArrowLeft size={16} />
@@ -382,125 +407,220 @@ export default function ProjectDetails() {
           </Link>
         </div>
 
-        {/* ==================== PROJECT OWNER: MANAGE JOIN REQUESTS ==================== */}
-        <div className="join-requests-section">
-          <div className="section-badge-header">
-            <div>
-              <h2 className="details-section-title" style={{ marginBottom: '0.25rem' }}>
-                Join Requests in PostgreSQL ({requests.length})
-              </h2>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                {isOwnerView
-                  ? 'As project owner, you can review applications and Accept or Reject them.'
-                  : 'Manage applicant requests for this project.'}
-              </p>
+        {/* ==================== CONDITIONAL REQUESTS SECTION ==================== */}
+
+        {/* CASE 1: PROJECT OWNER VIEW (Sees all incoming requests with Accept/Reject actions) */}
+        {isOwner && (
+          <div className="join-requests-section">
+            <div className="section-badge-header">
+              <div>
+                <h2 className="details-section-title" style={{ marginBottom: '0.25rem' }}>
+                  Incoming Join Requests ({requests.length})
+                </h2>
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  Review applications from students interested in joining your project.
+                </p>
+              </div>
             </div>
 
-            <div className="dbms-badge" title="Relational Relationship">
-              <span>FOREIGN KEY (project_id) REFERENCES projects(id)</span>
-            </div>
+            {/* Action Notification */}
+            {actionNotice && (
+              <div className="alert alert-info" style={{ marginBottom: '1rem', padding: '0.75rem 1rem' }}>
+                <CheckCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{actionNotice}</span>
+              </div>
+            )}
+
+            {requests.length > 0 ? (
+              <div className="requests-list">
+                {requests.map((req) => (
+                  <div key={req.id} className={`request-card ${req.status.toLowerCase()}`}>
+                    <div className="request-header">
+                      <div>
+                        <div className="request-applicant-name">
+                          <User size={16} style={{ color: 'var(--primary-blue)' }} />
+                          <span>{req.applicantName}</span>
+                        </div>
+                        <div className="request-applicant-email">
+                          <Mail size={13} />
+                          <a href={`mailto:${req.applicantEmail}`}>{req.applicantEmail}</a>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span className={`status-badge ${req.status.toLowerCase()}`}>
+                          {req.status === 'Pending' && <Clock size={12} />}
+                          {req.status === 'Accepted' && <Check size={12} />}
+                          {req.status === 'Rejected' && <X size={12} />}
+                          {req.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Applicant Pitch */}
+                    <div className="request-message-box">
+                      <p>"{req.message}"</p>
+                    </div>
+
+                    {/* Footer with date and Owner Actions */}
+                    <div className="request-actions">
+                      <span className="request-date">Applied on {req.createdAt}</span>
+
+                      {req.status === 'Pending' ? (
+                        <div className="request-buttons">
+                          <button
+                            type="button"
+                            className="btn btn-success btn-sm"
+                            onClick={() => handleUpdateStatus(req.id, 'Accepted', req.applicantName)}
+                          >
+                            <Check size={14} />
+                            <span>Accept</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleUpdateStatus(req.id, 'Rejected', req.applicantName)}
+                          >
+                            <X size={14} />
+                            <span>Reject</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                          Status: <strong>{req.status.toUpperCase()}</strong>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state" style={{ padding: '2rem 1.5rem', margin: '1rem 0' }}>
+                <div className="empty-state-icon" style={{ width: '44px', height: '44px', marginBottom: '0.75rem' }}>
+                  <Inbox size={22} />
+                </div>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                  No Join Requests Yet
+                </h3>
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  When other students request to join your project, their applications will appear here.
+                </p>
+              </div>
+            )}
           </div>
+        )}
 
-          {/* Action Notification (UPDATE confirmation) */}
-          {actionNotice && (
-            <div className="alert alert-info" style={{ marginBottom: '1rem', padding: '0.75rem 1rem' }}>
-              <CheckCircle size={16} style={{ flexShrink: 0 }} />
-              <span>{actionNotice}</span>
+        {/* CASE 2: APPLICANT VIEW (Sees only their own request status, with NO Accept/Reject buttons) */}
+        {!isOwner && myRequest && (
+          <div className="join-requests-section">
+            <div className="section-badge-header">
+              <div>
+                <h2 className="details-section-title" style={{ marginBottom: '0.25rem' }}>
+                  Your Join Request Status
+                </h2>
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  You have applied to join this project. Here is the current status of your request:
+                </p>
+              </div>
             </div>
-          )}
 
-          {/* Requests List */}
-          {requests.length > 0 ? (
-            <div className="requests-list">
-              {requests.map((req) => (
-                <div key={req.id} className={`request-card ${req.status.toLowerCase()}`}>
-                  <div className="request-header">
-                    <div>
-                      <div className="request-applicant-name">
-                        <User size={16} style={{ color: 'var(--primary-blue)' }} />
-                        <span>{req.applicantName}</span>
-                      </div>
-                      <div className="request-applicant-email">
-                        <Mail size={13} />
-                        <a href={`mailto:${req.applicantEmail}`}>{req.applicantEmail}</a>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span className={`status-badge ${req.status.toLowerCase()}`}>
-                        {req.status === 'Pending' && <Clock size={12} />}
-                        {req.status === 'Accepted' && <Check size={12} />}
-                        {req.status === 'Rejected' && <X size={12} />}
-                        {req.status}
-                      </span>
-                    </div>
+            <div className={`request-card ${myRequest.status.toLowerCase()}`}>
+              <div className="request-header">
+                <div>
+                  <div className="request-applicant-name">
+                    <User size={16} style={{ color: 'var(--primary-blue)' }} />
+                    <span>Your Application ({myRequest.applicantName})</span>
                   </div>
-
-                  {/* Applicant Message / Pitch */}
-                  <div className="request-message-box">
-                    <p>"{req.message}"</p>
-                  </div>
-
-                  {/* Footer with date and Owner Actions (Accept / Reject) */}
-                  <div className="request-actions">
-                    <span className="request-date">Applied on {req.createdAt}</span>
-
-                    {/* Accept / Reject buttons (Active for Pending status) */}
-                    {req.status === 'Pending' ? (
-                      <div className="request-buttons">
-                        <button
-                          type="button"
-                          className="btn btn-success btn-sm"
-                          onClick={() => handleUpdateStatus(req.id, 'Accepted', req.applicantName)}
-                        >
-                          <Check size={14} />
-                          <span>Accept Request</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          className="btn btn-danger btn-sm"
-                          onClick={() => handleUpdateStatus(req.id, 'Rejected', req.applicantName)}
-                        >
-                          <X size={14} />
-                          <span>Reject</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        Status decided: <strong>{req.status.toUpperCase()}</strong>
-                      </div>
-                    )}
+                  <div className="request-applicant-email">
+                    <Mail size={13} />
+                    <span>{myRequest.applicantEmail}</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state" style={{ padding: '2rem 1.5rem', margin: '1rem 0' }}>
-              <div className="empty-state-icon" style={{ width: '44px', height: '44px', marginBottom: '0.75rem' }}>
-                <Inbox size={22} />
+
+                <span className={`status-badge ${myRequest.status.toLowerCase()}`}>
+                  {myRequest.status === 'Pending' && <Clock size={12} />}
+                  {myRequest.status === 'Accepted' && <Check size={12} />}
+                  {myRequest.status === 'Rejected' && <X size={12} />}
+                  {myRequest.status}
+                </span>
               </div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                No Join Requests in Database
-              </h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                Interested students will appear here when they request to join this project.
-              </p>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setIsModalOpen(true)}
-              >
-                <Send size={14} />
-                <span>Submit a Test Join Request</span>
-              </button>
+
+              {/* Status explanation for the applicant */}
+              {myRequest.status === 'Accepted' && (
+                <div
+                  style={{
+                    backgroundColor: '#ecfdf5',
+                    border: '1px solid #a7f3d0',
+                    color: '#065f46',
+                    padding: '0.75rem 1rem',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.9rem',
+                    marginBottom: '0.75rem'
+                  }}
+                >
+                  🎉 <strong>Accepted!</strong> The project lead has accepted your request. Reach out at{' '}
+                  <a href={`mailto:${project.contactEmail}`} style={{ textDecoration: 'underline', fontWeight: 600 }}>
+                    {project.contactEmail}
+                  </a>{' '}
+                  to coordinate and begin working together!
+                </div>
+              )}
+
+              {myRequest.status === 'Pending' && (
+                <div
+                  style={{
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    color: '#92400e',
+                    padding: '0.75rem 1rem',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.9rem',
+                    marginBottom: '0.75rem'
+                  }}
+                >
+                  ⏳ <strong>Pending Review:</strong> Your request has been sent to the project owner (
+                  <strong>{project.owner}</strong>). You will see an update here once they respond.
+                </div>
+              )}
+
+              {myRequest.status === 'Rejected' && (
+                <div
+                  style={{
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    color: '#991b1b',
+                    padding: '0.75rem 1rem',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.9rem',
+                    marginBottom: '0.75rem'
+                  }}
+                >
+                  Your request to join this project was not accepted by the project owner. Feel free to explore other projects!
+                </div>
+              )}
+
+              {/* Your submitted pitch */}
+              <div className="request-message-box">
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>
+                  Your note to the project lead:
+                </span>
+                <p>"{myRequest.message}"</p>
+              </div>
+
+              <div className="request-actions">
+                <span className="request-date">Submitted on {myRequest.createdAt}</span>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* CASE 3: Unrelated student who has NOT applied sees NO requests section at all.
+            This ensures applicant privacy is completely maintained. */}
       </div>
 
       {/* ==================== JOIN REQUEST MODAL ==================== */}
-      {isModalOpen && (
+      {isModalOpen && !isOwner && !myRequest && (
         <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -522,7 +642,15 @@ export default function ProjectDetails() {
             <form onSubmit={handleJoinSubmit} noValidate>
               <div className="modal-body">
                 {formErrors.submit && (
-                  <div className="alert alert-info" style={{ backgroundColor: '#fef2f2', borderColor: '#fca5a5', color: '#b91c1c', marginBottom: '1rem' }}>
+                  <div
+                    className="alert alert-info"
+                    style={{
+                      backgroundColor: '#fef2f2',
+                      borderColor: '#fca5a5',
+                      color: '#b91c1c',
+                      marginBottom: '1rem'
+                    }}
+                  >
                     <AlertCircle size={18} style={{ flexShrink: 0 }} />
                     <span>{formErrors.submit}</span>
                   </div>
@@ -537,7 +665,7 @@ export default function ProjectDetails() {
                     name="applicantName"
                     type="text"
                     className={`form-control ${formErrors.applicantName ? 'input-error' : ''}`}
-                    placeholder="e.g. Aniket Deshmukh"
+                    placeholder="e.g. Rakesh Kumar"
                     value={requestFormData.applicantName}
                     onChange={handleFormChange}
                   />
@@ -557,7 +685,7 @@ export default function ProjectDetails() {
                     name="applicantEmail"
                     type="email"
                     className={`form-control ${formErrors.applicantEmail ? 'input-error' : ''}`}
-                    placeholder="e.g. aniket.d@college.edu"
+                    placeholder="e.g. rakesh.kumar@college.edu"
                     value={requestFormData.applicantEmail}
                     onChange={handleFormChange}
                   />
@@ -577,7 +705,7 @@ export default function ProjectDetails() {
                     name="message"
                     rows="3"
                     className={`form-control ${formErrors.message ? 'input-error' : ''}`}
-                    placeholder="Briefly state why you want to join and what you can contribute (e.g., frontend, database, AI algorithms)..."
+                    placeholder="Briefly state why you want to join and what skills you can contribute..."
                     value={requestFormData.message}
                     onChange={handleFormChange}
                   />
@@ -586,9 +714,6 @@ export default function ProjectDetails() {
                       <AlertCircle size={13} /> {formErrors.message}
                     </p>
                   )}
-                  <p className="form-helper" style={{ marginTop: '0.4rem' }}>
-                    DBMS Action: Submits a new row into PostgreSQL <code>join_requests</code> with status = 'Pending'.
-                  </p>
                 </div>
               </div>
 
@@ -602,7 +727,7 @@ export default function ProjectDetails() {
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={isSubmittingJoin}>
                   <Send size={15} />
-                  <span>{isSubmittingJoin ? 'Saving...' : 'Send Request'}</span>
+                  <span>{isSubmittingJoin ? 'Submitting...' : 'Send Request'}</span>
                 </button>
               </div>
             </form>

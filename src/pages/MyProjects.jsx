@@ -4,13 +4,11 @@ import {
   FolderKanban,
   PlusCircle,
   CheckCircle2,
-  AlertTriangle,
   User,
   Mail,
   Clock,
   Check,
   X,
-  Database,
   Inbox
 } from 'lucide-react';
 import ProjectCard from '../components/ProjectCard';
@@ -25,11 +23,10 @@ import {
 
 /**
  * Page 4: My Projects
- * Connects to PostgreSQL via FastAPI backend.
  * Displays:
- * 1. Projects created by the active test user (SELECT * FROM projects WHERE owner_id = 1)
- * 2. Deletion with PostgreSQL ON DELETE CASCADE
- * 3. Incoming Join Requests with PostgreSQL UPDATE status = 'Accepted' / 'Rejected'
+ * 1. Projects created by the active user (CURRENT_USER_ID).
+ * 2. Incoming Join Requests across all owned projects with Accept / Reject actions.
+ * 3. Deletion with cascade.
  */
 export default function MyProjects() {
   const [userProjects, setUserProjects] = useState([]);
@@ -37,7 +34,6 @@ export default function MyProjects() {
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState(null);
 
-  // Load user projects and incoming requests from PostgreSQL
   useEffect(() => {
     loadData();
   }, []);
@@ -59,30 +55,30 @@ export default function MyProjects() {
     }
   };
 
-  // Handle deletion of a project with confirmation (PostgreSQL: ON DELETE CASCADE)
+  // Handle deletion of a project with confirmation
   const handleDeleteProject = async (id, title) => {
     const isConfirmed = window.confirm(
-      `Are you sure you want to delete "${title}"?\n\nDBMS Impact: This will execute DELETE FROM projects WHERE id = ${id}.\nPostgreSQL will automatically trigger ON DELETE CASCADE to remove all linked join requests.`
+      `Are you sure you want to delete "${title}"?\n\nThis will remove the project and all associated join requests.`
     );
 
     if (isConfirmed) {
       try {
         await deleteProject(id);
         await loadData();
-        showNotification(`Project "${title}" was deleted from PostgreSQL database along with its cascaded join requests.`);
+        showNotification(`Project "${title}" was successfully deleted.`);
       } catch (err) {
         alert(`Error deleting project: ${err.message}`);
       }
     }
   };
 
-  // Handle Accept / Reject join request (PostgreSQL: UPDATE join_requests SET status = ?)
+  // Handle Accept / Reject join request
   const handleUpdateStatus = async (requestId, newStatus, applicantName) => {
     try {
       await updateJoinRequestStatus(requestId, newStatus);
       await loadData();
       showNotification(
-        `Application from ${applicantName} marked as ${newStatus.toUpperCase()} in PostgreSQL.`
+        `Application from ${applicantName} has been ${newStatus.toLowerCase()}.`
       );
     } catch (err) {
       alert(`Error updating request status: ${err.message}`);
@@ -102,8 +98,7 @@ export default function MyProjects() {
       <div className="page-header">
         <h1 className="page-title">My Projects</h1>
         <p className="page-subtitle">
-          Projects created by <strong>{CURRENT_USER_NAME}</strong> (Test User ID: <code>{CURRENT_USER_ID}</code>).
-          Stored in PostgreSQL database.
+          Projects created by <strong>{CURRENT_USER_NAME}</strong>. Manage your project ideas and review applicant join requests.
         </p>
       </div>
 
@@ -118,14 +113,14 @@ export default function MyProjects() {
       {/* Section 1: User's Published Projects */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-secondary)' }}>
-          <p>Loading projects from PostgreSQL...</p>
+          <p>Loading projects...</p>
         </div>
       ) : userProjects.length > 0 ? (
         <div>
           <div className="filter-stats" style={{ marginBottom: '1.25rem' }}>
             <span>
-              You have <strong>{userProjects.length}</strong>{' '}
-              {userProjects.length === 1 ? 'project' : 'projects'} stored in PostgreSQL.
+              You have published <strong>{userProjects.length}</strong>{' '}
+              {userProjects.length === 1 ? 'project' : 'projects'}.
             </span>
             <Link to="/add-project" className="btn btn-primary btn-sm">
               <PlusCircle size={14} />
@@ -149,16 +144,11 @@ export default function MyProjects() {
             <div className="section-badge-header">
               <div>
                 <h2 className="details-section-title" style={{ marginBottom: '0.25rem' }}>
-                  Received Join Requests in PostgreSQL ({incomingRequests.length})
+                  Incoming Join Requests ({incomingRequests.length})
                 </h2>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                  Students who applied to join your projects. You can Accept or Reject each application.
+                  Students who applied to join your projects. Review and Accept or Reject each application.
                 </p>
-              </div>
-
-              <div className="dbms-badge">
-                <Database size={13} />
-                <span>SELECT * FROM join_requests WHERE project_id IN (my_projects)</span>
               </div>
             </div>
 
@@ -250,9 +240,9 @@ export default function MyProjects() {
           <div className="empty-state-icon">
             <FolderKanban size={28} />
           </div>
-          <h2 className="empty-state-title">No Projects Created Yet in PostgreSQL</h2>
+          <h2 className="empty-state-title">No Projects Created Yet</h2>
           <p className="empty-state-desc">
-            You haven't posted any project ideas under your test user account yet. Share your first idea to recruit teammates, receive join requests, and collaborate across campus!
+            You haven't posted any project ideas yet. Share your first idea to recruit teammates, receive join requests, and collaborate across campus!
           </p>
           <Link to="/add-project" className="btn btn-primary">
             <PlusCircle size={16} />
