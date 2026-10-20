@@ -46,9 +46,6 @@ export default function App() {
           <p>
             <strong className="footer-highlight">IdeaForge</strong> — Turn Ideas Into Innovation
           </p>
-          <p style={{ marginTop: '0.25rem', color: 'var(--text-muted)' }}>
-            College DBMS Project Frontend • Prepared for FastAPI & PostgreSQL Backend Integration
-          </p>
         </footer>
       </div>
     </Router>

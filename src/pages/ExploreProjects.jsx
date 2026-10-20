@@ -57,24 +57,6 @@ export default function ExploreProjects() {
     <div>
       {/* Hero Header Section */}
       <section className="hero-section">
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
-          <div className="tagline-badge">
-            <Sparkles size={14} />
-            <span>Turn Ideas Into Innovation</span>
-          </div>
-
-          {backendStatus && (
-            <div
-              className="tagline-badge"
-              style={{ backgroundColor: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' }}
-              title="Connected to PostgreSQL Database via FastAPI"
-            >
-              <Database size={13} />
-              <span>PostgreSQL Connected</span>
-            </div>
-          )}
-        </div>
-
         <h1 className="hero-title">
           Discover Ideas. Find Your Team.{' '}
           <span className="hero-title-accent">Build Something Amazing.</span>

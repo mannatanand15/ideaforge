@@ -23,12 +23,18 @@ export default function ProjectCard({ project, showDelete = false, onDelete }) {
   };
 
   // Parse comma-separated skills for display as individual chips
-  const skillsList = project.requiredSkills
+  
+const skillsList = Array.isArray(project.requiredSkills)
+  ? project.requiredSkills
+      .map((s) => String(s).trim())
+      .filter(Boolean)
+  : typeof project.requiredSkills === 'string'
     ? project.requiredSkills
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean)
     : [];
+
 
   const handleDelete = () => {
     if (onDelete) {
