@@ -361,6 +361,7 @@ a {
   cursor: default;
 }
 
+
 .badge:focus,
 .badge:active,
 .category-badge:focus,
@@ -369,34 +370,49 @@ a {
   box-shadow: none;
 }
 
-.badge-web {
-  background-color: #eff6ff; /* subtle light-blue */
-  color: #1e40af;
-  border: none;
-  outline: none;
-}
-
+/* Shared styling for all project category badges */
+.badge-web,
+.badge-aiml,
 .badge-ai,
-.badge-aiml {
-  background-color: #eff6ff; /* subtle light-blue */
-  color: #1e40af;
-  border: none;
-  outline: none;
-}
-
-.badge-app {
-  background-color: #eff6ff; /* subtle light-blue */
-  color: #1e40af;
-  border: none;
-  outline: none;
-}
-
+.badge-app,
 .badge-other {
-  background-color: #f1f5f9; /* subtle light-gray */
-  color: #475569;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
   outline: none;
+  box-shadow: none;
 }
+
+/* Web Development — blue */
+.badge-web {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* AI/ML — purple */
+.badge-aiml,
+.badge-ai {
+  background-color: #ede9fe;
+  color: #6d28d9;
+}
+
+/* App Development — green */
+.badge-app {
+  background-color: #d1fae5;
+  color: #047857;
+}
+
+/* Other — orange */
+.badge-other {
+  background-color: #ffedd5;
+  color: #c2410c;
+}
+
 
 .badge-my-project {
   background-color: #ecfdf5;

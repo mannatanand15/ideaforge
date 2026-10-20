@@ -47,9 +47,15 @@ const skillsList = Array.isArray(project.requiredSkills)
       <div>
         {/* Card Header: Category & My Project badge */}
         <div className="project-card-header">
-          <span className={`badge ${getCategoryBadgeClass(project.category)}`}>
-            {project.category}
-          </span>
+          
+
+<span
+  className={`badge ${getCategoryBadgeClass(project.category || 'Other')}`}
+>
+  {project.category || 'Other'}
+</span>
+
+
           {project.createdByCurrentUser && (
             <span className="badge badge-my-project" title="Created by active test user in PostgreSQL">
               Your Project
